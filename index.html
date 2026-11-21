@@ -1,0 +1,604 @@
+<!doctype html>
+<!--
+Mis Finanzas: app universitaria offline para ingresos, gastos, presupuestos, metas y reportes.
+Uso: abre este archivo, elige mes, navega con el hash o los menús y usa + para agregar movimientos.
+Organización: HTML/PÁGINAS, CSS/DISEÑO, JAVASCRIPT/MODELO-CÁLCULOS-NAVEGACIÓN-EVENTOS.
+No usa internet, paquetes ni archivos externos.
+-->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f6f8">
+  <title>Mis Finanzas</title>
+  <style>
+    /* ========== SECCIÓN: VARIABLES Y BASE ========== */
+    /* PERSONALIZAR: colores principales y paletas. */
+    :root {
+      color-scheme: light;
+      --bg:#f4f6f8; --surface:#fff; --surface-2:#eef2f6; --text:#18212b;
+      --muted:#697586; --primary:#536df6; --primary-soft:#edf0ff;
+      --green:#16836a; --green-soft:#e5f4ef; --amber:#b06c10; --amber-soft:#fff2d9;
+      --red:#c44d55; --red-soft:#fdebed; --border:#dde3ea; --shadow:0 10px 28px rgba(31,45,61,.08);
+      --danger:#c44d55;
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    }
+    /* Modo oscuro controlado por atributo para persistir la elección manual. */
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg:#11151b; --surface:#1a2028; --surface-2:#242c36; --text:#edf2f7;
+      --muted:#abb6c4; --primary:#8295ff; --primary-soft:#293352;
+      --green:#66c5a9; --green-soft:#203b34; --amber:#f0b45d; --amber-soft:#4a3a22;
+      --red:#ee7a81; --red-soft:#4a292d; --border:#303a46; --shadow:0 10px 28px rgba(0,0,0,.24);
+    }
+    *{box-sizing:border-box} html{height:100%} body{min-height:100%;margin:0;background:var(--bg);color:var(--text)}
+    button,input,select{font:inherit} button{cursor:pointer} button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+    .app{min-height:100vh}
+    .amount,.stat-value,.insight-value,td.amount{font-variant-numeric:tabular-nums}
+    /* ========== SECCIÓN: NAVEGACIÓN ========== */
+    /* Navegación lateral: visible desde 900px. Barra inferior: visible en móvil. */
+    .sidebar{display:none}.mobile-nav{display:flex;position:fixed;z-index:30;bottom:0;left:0;right:0;height:calc(68px + env(safe-area-inset-bottom));padding:8px 8px env(safe-area-inset-bottom);background:var(--surface);border-top:1px solid var(--border)}
+    .mobile-nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;text-decoration:none;color:var(--muted);font-size:10px}.mobile-nav a.active{color:var(--primary);font-weight:800}.mobile-nav .nav-icon{font-size:18px}
+    .main{padding:18px 16px calc(92px + env(safe-area-inset-bottom));max-width:1180px;margin:auto}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.brand{display:flex;align-items:center;gap:9px}.brand-mark{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:var(--primary);color:white;font-weight:900}.brand-name{font-weight:850}.month-control{display:flex;align-items:center;gap:8px}.month-control label{display:none}
+    input,select{min-height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);padding:10px 12px}
+    /* ========== SECCIÓN: TARJETAS Y PÁGINAS ========== */
+    .page{display:none;animation:pageIn .18s ease}.page.active{display:block}.page-title{margin:0 0 4px;font-size:26px}.page-subtitle{margin:0 0 18px;color:var(--muted);font-size:13px}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}.section{padding:16px}.grid{display:grid;gap:12px}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stats .card:first-child{grid-column:1/-1}
+    .stat{padding:15px;min-height:112px}.stat-label{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px}.stat-value{margin-top:12px;font-size:22px;font-weight:850}.stat-note{margin-top:5px;color:var(--muted);font-size:11px}
+    .health{display:flex;align-items:flex-start;gap:12px;margin:12px 0;padding:16px}.health .icon{font-size:28px}.health strong{display:block}.health p{margin:5px 0 0;color:var(--muted);font-size:12px}
+    .health.healthy{background:var(--green-soft);border-color:var(--green)}.health.warn{background:var(--amber-soft);border-color:var(--amber)}.health.danger{background:var(--red-soft);border-color:var(--red)}.health.neutral{background:var(--surface)}
+    .panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}.panel-head h2{margin:0;font-size:16px}.panel-head p{margin:4px 0 0;color:var(--muted);font-size:11px}
+    .link-button,.icon-button{border:0;background:none;color:var(--primary);font-weight:750;text-decoration:none}.icon-button{padding:8px 4px}.list-row{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 0;border-top:1px solid var(--border)}.list-row:first-child{border-top:0}.emoji{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--surface-2);font-size:20px}.row-title{font-weight:750}.row-sub{margin-top:3px;color:var(--muted);font-size:11px}.row-actions{display:flex;gap:4px}.positive{color:var(--green)}.negative{color:var(--red)}
+    .empty{min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted);border:1px dashed var(--border);border-radius:14px;padding:18px}.empty svg{width:90px;height:70px;margin-bottom:8px}.empty strong{color:var(--text)}
+    /* ========== SECCIÓN: BOTONES, FORMULARIOS Y MODAL ========== */
+    .button{min-height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);padding:10px 14px;font-weight:750}.button.primary{background:var(--primary);border-color:var(--primary);color:white}.button.danger{color:var(--red)}.fab{position:fixed;z-index:25;right:18px;bottom:calc(78px + env(safe-area-inset-bottom));width:56px;height:56px;border:0;border-radius:18px;background:var(--primary);color:white;font-size:30px;box-shadow:0 12px 24px rgba(83,109,246,.30)}
+    dialog{width:min(520px,calc(100% - 24px));max-height:calc(100vh - 24px);border:1px solid var(--border);border-radius:18px;padding:0;background:var(--surface);color:var(--text);box-shadow:0 24px 70px rgba(0,0,0,.28)}dialog::backdrop{background:rgba(10,15,22,.55)}.dialog-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}.dialog-head h2{margin:0;font-size:17px}.dialog-body{padding:16px}.form-grid{display:grid;gap:12px}.field{display:grid;gap:6px}.field label{font-size:12px;font-weight:750}.field-error{min-height:16px;color:var(--red);font-size:11px}.field input,.field select{width:100%}.form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}.check-row{display:flex;align-items:center;gap:9px}.check-row input{width:18px;height:18px;min-height:18px}
+    /* ========== SECCIÓN: PRESUPUESTO, METAS Y REPORTES ========== */
+    .budget-row{padding:12px 0;border-top:1px solid var(--border)}.budget-row:first-child{border-top:0}.budget-meta{display:flex;justify-content:space-between;gap:8px;font-size:12px}.track{height:9px;margin:8px 0 5px;border-radius:99px;background:var(--surface-2);overflow:hidden}.track span{display:block;height:100%;border-radius:99px;background:var(--green);transition:width .35s ease}.track span.warn{background:var(--amber)}.track span.over{background:var(--red)}.budget-note{color:var(--muted);font-size:11px}
+    .goal{padding:13px 0;border-top:1px solid var(--border)}.goal:first-child{border-top:0}.goal-head{display:flex;justify-content:space-between;gap:10px}.goal-head strong{font-size:13px}.goal-head small{color:var(--muted)}.goal-actions{display:flex;justify-content:flex-end}
+    .filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.filter-grid .search{grid-column:1/-1}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th{color:var(--muted);font-size:10px;text-align:left}.table td{padding:10px 4px;border-top:1px solid var(--border);font-size:12px}.hide-mobile{display:none}
+    .chart{width:100%;height:240px}.chart-label{fill:var(--muted);font-size:10px}.grid-line{stroke:var(--border);stroke-width:1}.income-line{fill:none;stroke:var(--green);stroke-width:3}.expense-line{fill:none;stroke:var(--red);stroke-width:3}.income-dot{fill:var(--green)}.expense-dot{fill:var(--red)}.category-bar{fill:var(--primary)}.legend{display:flex;gap:12px;color:var(--muted);font-size:11px}
+    .settings-grid{display:grid;gap:12px}.settings-item{padding:14px}.category-manager{display:grid;gap:8px}.category-edit{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:8px}.category-edit input{min-width:0}.theme-options{display:flex;flex-wrap:wrap;gap:8px}.theme-options button.active{border-color:var(--primary);background:var(--primary-soft)}
+    .report-grid{display:grid;gap:12px;grid-template-columns:1fr}
+    /* ========== SECCIÓN: RESPONSIVE Y MOVIMIENTO ========== */
+    @keyframes pageIn{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+    /* ========== SECCIÓN: AJUSTES PARA TELÉFONO ========== */
+    /* Mantiene controles tocables, texto legible y evita desbordes horizontales. */
+    @media(max-width:599px){
+      body{overflow-x:hidden}
+      .main{width:100%;padding:14px 12px calc(96px + env(safe-area-inset-bottom))}
+      .topbar{gap:8px;margin-bottom:14px}
+      .brand{min-width:0}.brand-name{display:none}.brand-mark{width:36px;height:36px}
+      .month-control{margin-left:auto}.month-control input{width:150px;max-width:42vw;min-height:42px;padding:8px}
+      .page-title{font-size:23px}.page-subtitle{margin-bottom:14px}
+      .card{border-radius:14px}.section{padding:13px}
+      .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stats .card:first-child{grid-column:1/-1}
+      .stat{min-height:104px;padding:13px}.stat-value{font-size:20px}
+      .health{margin:8px 0 12px;padding:14px}
+      .health p{font-size:11px}
+      .panel-head{gap:8px}.panel-head h2{font-size:15px}.panel-head p{line-height:1.45}
+      .panel-head .button{flex:0 0 auto;padding:9px 10px;white-space:nowrap}
+      .mobile-nav{height:calc(64px + env(safe-area-inset-bottom));padding:5px 2px env(safe-area-inset-bottom)}
+      .mobile-nav a{font-size:9px}.mobile-nav .nav-icon{font-size:17px}
+      .fab{right:14px;bottom:calc(74px + env(safe-area-inset-bottom));width:52px;height:52px;border-radius:16px}
+      .filter-grid{grid-template-columns:1fr 1fr}.filter-grid select,.filter-grid input{width:100%;min-width:0}
+      .filter-grid .search{width:100%}
+      .list-row{grid-template-columns:38px minmax(0,1fr) minmax(68px,auto);gap:8px;padding:12px 0}
+      .list-row .emoji{width:38px;height:38px;border-radius:10px}
+      .row-title{overflow:hidden;text-overflow:ellipsis}.row-sub{line-height:1.35}
+      .row-actions{justify-content:flex-end;gap:0}.row-actions .icon-button{font-size:11px;padding:6px 3px}
+      .budget-meta{align-items:flex-start}.budget-meta>div:last-child{display:flex;flex-wrap:wrap;justify-content:flex-end}
+      .goal-head{align-items:flex-start}.goal-head small{text-align:right}
+      .goal-actions .icon-button{padding:8px 5px}
+      .table-wrap{margin:0 -4px;padding:0 4px}.table{min-width:520px}
+      .chart{height:210px}.legend{margin:8px 0}
+      .settings-grid{grid-template-columns:1fr}.settings-item{padding:13px}
+      .theme-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+      .theme-options .button{padding:10px 6px;font-size:12px}
+      .category-edit{grid-template-columns:38px minmax(0,1fr) auto}
+      dialog{width:calc(100% - 16px);max-height:calc(100dvh - 16px);border-radius:16px}
+      .dialog-head{padding:12px 14px}.dialog-body{padding:14px}
+      .form-grid{gap:10px}.form-actions{position:sticky;bottom:-14px;padding:10px 0 2px;background:var(--surface)}
+    }
+    @media(max-width:359px){
+      .stats{grid-template-columns:1fr}.stats .card:first-child{grid-column:auto}
+      .filter-grid{grid-template-columns:1fr}.filter-grid .search{grid-column:auto}
+      .month-control input{width:138px}
+      .panel-head{flex-wrap:wrap}.panel-head .button{width:100%}
+      .mobile-nav a{font-size:8px}
+      .list-row{grid-template-columns:36px minmax(0,1fr);align-items:start}
+      .list-row>div:last-child{text-align:right}
+      .row-actions{grid-column:1/-1}
+    }
+    @media(min-width:600px){.main{padding:24px 24px 100px}.stats{grid-template-columns:repeat(5,minmax(0,1fr))}.stats .card:first-child{grid-column:auto}.stat{min-height:125px}.filter-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.filter-grid .search{grid-column:auto}.hide-mobile{display:table-cell}.settings-grid{grid-template-columns:1fr 1fr}.report-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(min-width:900px){.mobile-nav{display:none}.sidebar{display:flex;position:fixed;z-index:30;left:0;top:0;bottom:0;width:220px;padding:20px 14px;flex-direction:column;background:var(--surface);border-right:1px solid var(--border)}.sidebar-brand{display:flex;align-items:center;gap:9px;padding:4px 8px 24px;font-weight:850}.nav-links{display:grid;gap:5px}.nav-links a{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:11px;text-decoration:none;color:var(--muted);font-size:13px}.nav-links a.active{background:var(--primary-soft);color:var(--primary);font-weight:800}.main{margin-left:220px;max-width:1300px;padding:28px 30px 60px}.fab{left:252px;right:auto;bottom:26px}.month-control label{display:inline}.settings-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  </style>
+</head>
+<body>
+  <!-- ========== SECCIÓN: NAVEGACIÓN Y CONTENEDORES ========== -->
+  <!-- BARRA: enlaces hash compartidos en escritorio y móvil. -->
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar-brand"><span class="brand-mark">$</span><span>Mis Finanzas</span></div>
+    <nav class="nav-links" id="desktop-nav">
+      <a href="#inicio" data-page="inicio">⌂ <span>Inicio</span></a><a href="#movimientos" data-page="movimientos">↔ <span>Movimientos</span></a>
+      <a href="#presupuesto" data-page="presupuesto">◫ <span>Presupuesto</span></a><a href="#metas" data-page="metas">◎ <span>Metas</span></a>
+      <a href="#reportes" data-page="reportes">▥ <span>Reportes</span></a><a href="#ajustes" data-page="ajustes">⚙ <span>Ajustes</span></a>
+    </nav>
+  </aside>
+  <nav class="mobile-nav" id="mobile-nav" aria-label="Navegación principal">
+    <a href="#inicio" data-page="inicio"><span class="nav-icon">⌂</span><span>Inicio</span></a><a href="#movimientos" data-page="movimientos"><span class="nav-icon">↔</span><span>Movs.</span></a>
+    <a href="#presupuesto" data-page="presupuesto"><span class="nav-icon">◫</span><span>Presup.</span></a><a href="#metas" data-page="metas"><span class="nav-icon">◎</span><span>Metas</span></a>
+    <a href="#reportes" data-page="reportes"><span class="nav-icon">▥</span><span>Reportes</span></a><a href="#ajustes" data-page="ajustes"><span class="nav-icon">⚙</span><span>Ajustes</span></a>
+  </nav>
+
+  <main class="main">
+    <!-- Cabecera compartida: el mes elegido se conserva al navegar y al recargar. -->
+    <header class="topbar"><div class="brand"><span class="brand-mark">$</span><span class="brand-name">Mis Finanzas</span></div>
+      <div class="month-control"><label for="month">Período</label><input id="month" type="month" aria-label="Mes seleccionado"></div>
+    </header>
+
+    <!-- PÁGINA: Inicio -->
+    <section class="page" id="page-inicio" data-page-name="inicio">
+      <h1 class="page-title" id="inicio-title">Inicio</h1><p class="page-subtitle">Resumen mensual de tus finanzas</p>
+      <div class="health card neutral" id="health"></div>
+      <div class="grid stats" id="home-stats"></div>
+      <section class="card section" style="margin-top:12px"><div class="panel-head"><div><h2>Últimos movimientos</h2><p id="recent-date"></p></div><a class="link-button" href="#movimientos">Ver todos →</a></div><div id="recent-list"></div></section>
+    </section>
+
+    <!-- PÁGINA: Movimientos -->
+    <section class="page" id="page-movimientos" data-page-name="movimientos">
+      <h1 class="page-title">Movimientos</h1><p class="page-subtitle">Altas, edición y consulta del mes</p>
+      <section class="card section">
+        <div class="filter-grid">
+          <select id="filter-type" aria-label="Filtrar por tipo"><option value="">Todos los tipos</option><option value="income">Ingresos</option><option value="expense">Gastos</option></select>
+          <select id="filter-category" aria-label="Filtrar por categoría"><option value="">Todas las categorías</option></select>
+          <select id="filter-method" aria-label="Filtrar por método"><option value="">Todos los métodos</option><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option></select>
+          <input class="search" id="filter-search" type="search" placeholder="Buscar por nota" aria-label="Buscar por nota">
+        </div>
+        <div id="movement-list"></div>
+      </section>
+    </section>
+
+    <!-- PÁGINA: Presupuesto -->
+    <section class="page" id="page-presupuesto" data-page-name="presupuesto">
+      <h1 class="page-title">Presupuesto</h1><p class="page-subtitle">Límites mensuales por categoría</p>
+      <div class="grid" style="grid-template-columns:1fr"><section class="card section"><div class="panel-head"><div><h2>Límites del mes</h2><p>Alertas visuales desde el 80 % y 100 %</p></div><button class="button" type="button" id="add-budget">＋ Nuevo límite</button></div><div id="budget-list"></div></section></div>
+      <section class="card section" style="margin-top:12px"><div class="panel-head"><div><h2>Gastos fijos</h2><p id="fixed-summary"></p></div></div></section>
+    </section>
+
+    <!-- PÁGINA: Metas -->
+    <section class="page" id="page-metas" data-page-name="metas">
+      <h1 class="page-title">Metas</h1><p class="page-subtitle">Planifica cuánto ahorrar</p><section class="card section"><div class="panel-head"><div><h2>Tus objetivos</h2><p>Ahorro mensual para llegar a tiempo</p></div><button class="button" type="button" id="add-goal">＋ Nueva meta</button></div><div id="goal-list"></div></section>
+    </section>
+
+    <!-- PÁGINA: Reportes -->
+    <section class="page" id="page-reportes" data-page-name="reportes">
+      <h1 class="page-title">Reportes</h1><p class="page-subtitle">Análisis del período seleccionado</p>
+      <div class="report-grid">
+        <section class="card section"><div class="panel-head"><div><h2>Gastos por categoría</h2><p>Mes seleccionado</p></div></div><div id="category-chart"></div></section>
+        <section class="card section"><div class="panel-head"><div><h2>Tendencia de 6 meses</h2><p>Ingresos y gastos</p></div></div><div class="legend"><span><i class="emoji" style="width:10px;height:10px;border-radius:50%;background:var(--green)"></i>Ingresos</span><span><i class="emoji" style="width:10px;height:10px;border-radius:50%;background:var(--red)"></i>Gastos</span></div><div id="trend-chart"></div></section>
+        <section class="card section"><div class="panel-head"><div><h2>Comparación por categoría</h2><p>Mes actual frente al mes anterior</p></div></div><div class="table-wrap" id="comparison"></div></section>
+        <section class="card section"><div class="panel-head"><div><h2>Gastos hormiga</h2><p id="ant-note"></p></div></div><div id="ant-report"></div></section>
+      </div>
+    </section>
+
+    <!-- PÁGINA: Ajustes -->
+    <section class="page" id="page-ajustes" data-page-name="ajustes">
+      <h1 class="page-title">Ajustes</h1><p class="page-subtitle">Personaliza y conserva tus datos</p>
+      <div class="settings-grid">
+        <section class="card settings-item"><div class="panel-head"><div><h2>Categorías</h2><p>Nombre, tipo y emoji</p></div></div><button class="button" id="add-category" type="button">＋ Nueva categoría</button><div class="category-manager" id="category-manager" style="margin-top:10px"></div></section>
+        <section class="card settings-item"><h2 style="margin-top:0;font-size:16px">Gasto hormiga</h2><label class="field">Umbral menor que <input id="ant-threshold" type="number" min="1" step=".01" inputmode="decimal"></label><p class="stat-note" id="ant-threshold-note"></p></section>
+        <section class="card settings-item"><h2 style="margin-top:0;font-size:16px">Tema</h2><div class="theme-options" id="theme-options"><button class="button" data-theme-choice="auto" type="button">Automático</button><button class="button" data-theme-choice="light" type="button">Claro</button><button class="button" data-theme-choice="dark" type="button">Oscuro</button></div></section>
+        <section class="card settings-item"><h2 style="margin-top:0;font-size:16px">Respaldo</h2><div class="grid" style="grid-template-columns:1fr 1fr"><button class="button" id="export" type="button">Exportar JSON</button><button class="button" id="import" type="button">Importar JSON</button></div></section>
+        <section class="card settings-item"><h2 style="margin-top:0;font-size:16px">Datos de prueba</h2><button class="button" id="examples" type="button">Cargar ejemplos</button></section>
+        <section class="card settings-item"><h2 style="margin-top:0;font-size:16px">Restablecer</h2><button class="button danger" id="clear" type="button">Borrar todo</button></section>
+      </div>
+    </section>
+  </main>
+
+  <!-- Botones flotantes solo en Inicio y Movimientos. -->
+  <button class="fab" id="fab" type="button" aria-label="Agregar movimiento" title="Agregar movimiento">＋</button>
+  <!-- Modal única: reutilizada para agregar y editar movimientos, presupuestos, metas y categorías. -->
+  <dialog id="dialog" aria-labelledby="dialog-title"><div class="dialog-head"><h2 id="dialog-title">Formulario</h2><button class="icon-button" id="dialog-close" type="button" aria-label="Cerrar">✕</button></div><div class="dialog-body" id="dialog-body"></div></dialog>
+  <input id="import-file" type="file" accept=".json,application/json" hidden>
+
+  <script>
+    "use strict";
+    /* ========== SECCIÓN: MODELO Y ALMACENAMIENTO ========== */
+    (() => {
+      // PERSONALIZAR: clave local. Cambiarla crea un almacén independiente.
+      const STORAGE_KEY="mis-finanzas-spa-v2";
+      // PERSONALIZAR: umbral inicial de USD 5; se guarda como centavos.
+      const DEFAULT_ANT_THRESHOLD=500;
+      // PERSONALIZAR: categorías universitarias iniciales. Cada objeto lleva nombre, tipo y emoji.
+      const DEFAULT_CATEGORIES=[
+        {name:"Matrícula/cuotas",type:"expense",emoji:"🎓"},{name:"Transporte",type:"expense",emoji:"🚌"},
+        {name:"Comida",type:"expense",emoji:"🍽️"},{name:"Materiales y copias",type:"expense",emoji:"📚"},
+        {name:"Internet y celular",type:"expense",emoji:"📶"},{name:"Ocio",type:"expense",emoji:"🎮"},
+        {name:"Salud",type:"expense",emoji:"🩺"},{name:"Ropa",type:"expense",emoji:"👕"},
+        {name:"Imprevistos",type:"expense",emoji:"⚠️"},{name:"Otros",type:"expense",emoji:"📦"},
+        {name:"Trabajo",type:"income",emoji:"💼"},{name:"Beca",type:"income",emoji:"🎓"},
+        {name:"Apoyo familiar",type:"income",emoji:"🏠"},{name:"Otros ingresos",type:"income",emoji:"💵"}
+      ];
+      // Constante global: métodos válidos usados por formularios y validación.
+      const PAYMENT_METHODS=["efectivo","tarjeta","transferencia"];
+      // Propósito: obtener elementos una sola vez. Entrada: selector CSS. Devuelve: elemento. Uso: toda la interfaz.
+      const $=selector=>document.querySelector(selector);
+      // Propósito: escapar texto dinámico antes de HTML/SVG. Entrada: valor. Devuelve: texto seguro. Uso: toda la interfaz.
+      const escapeHtml=value=>String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+      // Propósito: crear modelo vacío. Entrada: ninguna. Devuelve: datos y preferencias iniciales.
+      const fresh=()=>({version:2,data:{categories:DEFAULT_CATEGORIES.map(c=>({...c})),transactions:[],budgets:[],goals:[]},preferences:{theme:"auto",antThreshold:DEFAULT_ANT_THRESHOLD}});
+      let app=fresh(), storageOk=true, dialogSubmit=null;
+      // Variable global de sesión: indica si el usuario eligió manualmente un mes distinto al mes real.
+      // Si es false, la fecha y el período pueden avanzar automáticamente al cambiar de mes.
+      let manualMonthChoice=false;
+      // Propósito: cargar datos protegidos. Entrada: ninguna. Devuelve: nada; actualiza app o notifica corrupción.
+      function load(){
+        try{
+          const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return;
+          app=migrate(JSON.parse(raw));validateModel(app.data,app.preferences);
+        }catch(error){storageOk=false;app=fresh();alert("No se pudieron leer los datos guardados. La app sigue abierta con datos vacíos.");console.error(error)}
+      }
+      // Propósito: guardar datos protegidos. Entrada: ninguna. Devuelve: booleano. Uso: cada CRUD.
+      function save(){
+        try{localStorage.setItem(STORAGE_KEY,JSON.stringify(app));return true}catch(error){storageOk=false;alert("No se pudo guardar en localStorage. Los cambios siguen visibles en esta pestaña.");console.error(error);return false}
+      }
+
+      /* ========== SECCIÓN: VALIDACIÓN Y MIGRACIÓN ========== */
+      // Propósito: validar fecha AAAA-MM-DD por componentes. Entrada: texto. Devuelve: booleano.
+      function validDate(v){
+        if(typeof v!="string"||!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
+        const [y,m,d]=v.split("-").map(Number),leap=y%4===0&&(y%100!==0||y%400===0),days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+        return y>=1900&&m>=1&&m<=12&&d>=1&&d<=days[m-1];
+      }
+      // Propósito: validar período AAAA-MM. Entrada: texto. Devuelve: booleano.
+      function validMonth(v){if(typeof v!="string"||!/^\d{4}-\d{2}$/.test(v))return false;const[y,m]=v.split("-").map(Number);return y>=1900&&m>=1&&m<=12}
+      // Propósito: validar todo el modelo y preferencias. Entrada: data, preferencias. Devuelve: nada o error.
+      function validateModel(data,prefs){
+        if(!data||typeof data!="object"||!Array.isArray(data.categories)||!Array.isArray(data.transactions)||!Array.isArray(data.budgets)||!Array.isArray(data.goals))throw Error("Estructura principal no válida");
+        if(!prefs||!["auto","light","dark"].includes(prefs.theme)||!Number.isSafeInteger(prefs.antThreshold)||prefs.antThreshold<=0)throw Error("Preferencias no válidas");
+        const catKeys=new Set();
+        data.categories.forEach(c=>{if(!c||typeof c.name!="string"||!c.name.trim()||c.name.length>40||!["income","expense"].includes(c.type)||typeof c.emoji!="string")throw Error("Categoría no válida");const k=c.type+":"+c.name.toLowerCase();if(catKeys.has(k))throw Error("Categorías duplicadas");catKeys.add(k)});
+        const ids=new Set();
+        data.transactions.forEach(t=>{if(!t||typeof t.id!="string"||!t.id||ids.has(t.id)||!["income","expense"].includes(t.type)||!Number.isSafeInteger(t.amount)||t.amount<=0||!validDate(t.date)||typeof t.note!="string"||t.note.length>100||!PAYMENT_METHODS.includes(t.paymentMethod)||typeof t.fixed!="boolean"||(t.fixed&&t.type!="expense")||typeof t.category!="string"||!data.categories.some(c=>c.name===t.category&&c.type===t.type))throw Error("Movimiento no válido");ids.add(t.id)});
+        const bk=new Set();
+        data.budgets.forEach(b=>{if(!b||!validMonth(b.month)||!Number.isSafeInteger(b.limit)||b.limit<=0||typeof b.category!="string"||!data.categories.some(c=>c.name===b.category&&c.type=="expense"))throw Error("Presupuesto no válido");const k=b.month+":"+b.category;if(bk.has(k))throw Error("Presupuestos duplicados");bk.add(k)});
+        const gids=new Set();
+        data.goals.forEach(g=>{if(!g||typeof g.id!="string"||!g.id||gids.has(g.id)||typeof g.name!="string"||!g.name.trim()||g.name.length>60||!Number.isSafeInteger(g.target)||g.target<=0||!Number.isSafeInteger(g.saved)||g.saved<0||(g.due&&g.due!=""&&!validDate(g.due)))throw Error("Meta no válida");gids.add(g.id)});
+      }
+      // Propósito: migrar datos antiguos. Entrada: respaldo/local. Devuelve: estructura actual.
+      function migrate(raw){
+        if(raw&&raw.version===2&&raw.data&&raw.preferences)return raw;
+        if(raw&&raw.version===2&&raw.categories&&!raw.data)return {version:2,data:{categories:(raw.categories||[]).map(c=>({...c,emoji:c.emoji||"📦"})),transactions:(raw.transactions||[]).map(t=>({ ...t,note:t.note??t.description??"",fixed:t.fixed??t.isFixed??false,paymentMethod:PAYMENT_METHODS.includes(t.paymentMethod)?t.paymentMethod:"efectivo"})),budgets:raw.budgets||[],goals:raw.goals||[]},preferences:{theme:"auto",antThreshold:DEFAULT_ANT_THRESHOLD}};
+        if(raw&&raw.version===1&&Array.isArray(raw.categories)&&Array.isArray(raw.transactions)){
+          const cats=raw.categories.map(c=>({...c,emoji:c.emoji||"📦"}));return migrate({version:2,categories:[...cats,...DEFAULT_CATEGORIES.filter(dc=>!cats.some(c=>c.name.toLowerCase()==dc.name.toLowerCase()&&c.type==dc.type))],transactions:raw.transactions.map(t=>({...t,note:t.note??t.description??"",fixed:t.fixed??t.isFixed??false,paymentMethod:PAYMENT_METHODS.includes(t.paymentMethod)?t.paymentMethod:"efectivo"})),budgets:raw.budgets||[],goals:raw.goals||[]});
+        }
+        throw Error("Versión de datos no compatible");
+      }
+
+      /* ========== SECCIÓN: FECHAS, DINERO Y CÁLCULOS ========== */
+      // Propósito: guardar hoy sin zona horaria ISO. Entrada: ninguna. Devuelve: AAAA-MM-DD.
+      function today(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+      // Propósito: obtener mes local. Entrada: ninguna. Devuelve: AAAA-MM.
+      function monthNow(){return today().slice(0,7)}
+      // Propósito: obtener mes del selector. Entrada: ninguna. Devuelve: AAAA-MM.
+      function selectedMonth(){return $("#month").value||monthNow()}
+      // Propósito: contar días reales del mes. Entrada: AAAA-MM. Devuelve: entero.
+      function monthDays(v){const[y,m]=v.split("-").map(Number);return new Date(y,m,0).getDate()}
+      // Propósito: desplazar meses sin parsear cadenas. Entrada: AAAA-MM, delta. Devuelve: AAAA-MM.
+      function offsetMonth(v,d){const[y,m]=v.split("-").map(Number),n=new Date(y,m-1+d,1);return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")}
+      // Propósito: mostrar fecha DD/MM/AAAA sin Date ISO. Entrada: AAAA-MM-DD. Devuelve: texto.
+      function dateLabel(v){const[y,m,d]=v.split("-");return d+"/"+m+"/"+y}
+      // Propósito: mostrar mes legible. Entrada: AAAA-MM. Devuelve: texto.
+      function monthLabel(v){const[y,m]=v.split("-").map(Number);return new Intl.DateTimeFormat("es",{month:"long",year:"numeric"}).format(new Date(y,m-1,1))}
+      // Propósito: convertir centavos a USD. Entrada: entero. Devuelve: texto.
+      // PERSONALIZAR: formato de moneda; actualmente USD.
+      const money=cents=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(cents/100);
+      // Propósito: convertir entrada decimal exacta. Entrada: texto. Devuelve: centavos o null.
+      function centsInput(v){const s=String(v).trim().replace(",",".");if(!/^\d+(?:\.\d{1,2})?$/.test(s))return null;const[w,f=""]=s.split("."),n=Number(w)*100+Number((f+"00").slice(0,2));return Number.isSafeInteger(n)&&n>0?n:null}
+      // Propósito: sumar tipo por mes. Entrada: tipo, mes. Devuelve: centavos.
+      const sum=(type,month)=>app.data.transactions.reduce((n,t)=>n+(t.type==type&&t.date.slice(0,7)==month?t.amount:0),0);
+      // Propósito: buscar emoji. Entrada: nombre. Devuelve: emoji o 📦.
+      function emojiFor(name){return app.data.categories.find(c=>c.name==name)?.emoji||"📦"}
+
+      // Fórmulas de indicadores: ahorro=(ingresos-gastos)/ingresos×100; fijo=fijos/ingresos×100;
+      // promedio=gastos/días transcurridos o totales; restantes=balance/promedio;
+      // proyección=gasto actual/días transcurridos×días mes.
+      // Ejemplo: ingreso $1000, gasto $700 en 10/30 días = ahorro 30%, promedio $70 y proyección $2100.
+      function indicators(month){
+        const income=sum("income",month),expense=sum("expense",month),balance=income-expense,total=monthDays(month);
+        const elapsed=month<monthNow()?total:month>monthNow()?0:Math.min(new Date().getDate(),total);
+        const fixed=app.data.transactions.reduce((n,t)=>n+(t.type=="expense"&&t.fixed&&t.date.slice(0,7)==month?t.amount:0),0);
+        const threshold=app.preferences.antThreshold;
+        const ants=app.data.transactions.filter(t=>t.type=="expense"&&t.date.slice(0,7)==month&&t.amount<threshold&&["Comida","Ocio"].includes(t.category));
+        const daily=elapsed?expense/elapsed:null,remaining=daily&&daily>0?Math.floor(Math.max(balance,0)/daily):null;
+        const projected=elapsed&&month<=monthNow()?Math.round(expense/elapsed*total):month<monthNow()?expense:null;
+        const prev=offsetMonth(month,-1);
+        return{income,expense,balance,total,elapsed,prev,fixed,savings:income?balance/income*100:null,fixedRate:income?fixed/income*100:null,daily,remaining,projected,ants,totalAnts:ants.reduce((n,t)=>n+t.amount,0)};
+      }
+      // Propósito: comparar categoría contra mes previo sin dividir entre cero. Entrada: mes. Devuelve: filas.
+      function categoryRows(month){
+        const prev=offsetMonth(month,-1);
+        return app.data.categories.map(c=>{
+          const cur=app.data.transactions.filter(t=>t.category==c.name&&t.type==c.type&&t.date.slice(0,7)==month).reduce((n,t)=>n+t.amount,0);
+          const prior=app.data.transactions.filter(t=>t.category==c.name&&t.type==c.type&&t.date.slice(0,7)==prev).reduce((n,t)=>n+t.amount,0);
+          const diff=cur-prior,percent=prior==0?(cur==0?"0 %":"Nuevo"):(diff>=0?"+":"")+((diff/prior)*100).toFixed(1)+" %";
+          return{...c,cur,prior,diff,percent};
+        }).filter(r=>r.cur||r.prior);
+      }
+
+      /* ========== SECCIÓN: NAVEGACIÓN POR HASH ========== */
+      // Navegación: el hash es la ruta. hashchange oculta todas las páginas y muestra una.
+      // Para agregar una página: agréguela al array, a ambos nav y cree section id=page-nueva.
+      const ROUTES=["inicio","movimientos","presupuesto","metas","reportes","ajustes"];
+      // Propósito: cambiar página por hash. Entrada: evento o inicial. Devuelve: nada.
+      function route(){
+        let page=location.hash.replace("#","");
+        if(!ROUTES.includes(page)){page="inicio";history.replaceState(null,"","#inicio")}
+        document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.dataset.pageName==page));
+        document.querySelectorAll("[data-page]").forEach(a=>a.classList.toggle("active",a.dataset.page==page));
+        $("#fab").hidden=!(page=="inicio"||page=="movimientos");
+        window.scrollTo({top:0,behavior:"auto"});
+        renderAll();
+      }
+      window.addEventListener("hashchange",route);
+
+      /* ========== SECCIÓN: TEMA ========== */
+      // Propósito: aplicar preferencia automática/manual. Entrada: tema. Devuelve: nada.
+      function applyTheme(theme){
+        const chosen=theme=="auto"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):theme;
+        document.documentElement.dataset.theme=chosen;
+        document.querySelectorAll("[data-theme-choice]").forEach(b=>b.classList.toggle("active",b.dataset.themeChoice==theme));
+        const themeMeta=document.querySelector('meta[name="theme-color"]');
+        if(themeMeta)themeMeta.content=chosen=="dark"?"#11151b":"#f4f6f8";
+      }
+
+      /* ========== SECCIÓN: FORMULARIOS Y MODAL ========== */
+      // Propósito: abrir diálogo con formulario. Entrada: título, HTML, callback. Devuelve: muestra modal.
+      function openDialog(title,html,onSubmit){
+        $("#dialog-title").textContent=title;$("#dialog-body").innerHTML=html;dialogSubmit=onSubmit;
+        $("#dialog").showModal();const first=$("#dialog-body input, #dialog-body select");if(first)first.focus();
+      }
+      // Propósito: cerrar modal y limpiar callback. Entrada: ninguna. Devuelve: nada.
+      function closeDialog(){dialogSubmit=null;$("#dialog").close()}
+      // Propósito: insertar mensaje debajo de un campo. Entrada: id, mensaje. Devuelve: nada.
+      function fieldError(id,msg){const el=document.querySelector("#"+id+"-error");if(el)el.textContent=msg||""}
+      // Propósito: capturar movimiento. Entrada: movimiento opcional. Devuelve: guarda o valida.
+      function transactionForm(existing=null){
+        const type=existing?.type||"expense";
+        const form=(selectedType=type,selectedCategory=existing?.category||"")=>`<form id="tx-form" novalidate><div class="form-grid">
+          <div class="field"><label for="tx-type">Tipo</label><select id="tx-type" name="type"><option value="expense" ${selectedType=="expense"?"selected":""}>Gasto</option><option value="income" ${selectedType=="income"?"selected":""}>Ingreso</option></select><span class="field-error" id="tx-type-error"></span></div>
+          <div class="field"><label for="tx-category">Categoría</label><select id="tx-category" name="category">${categoryOptions(selectedType,selectedCategory)}</select><span class="field-error" id="tx-category-error"></span></div>
+          <div class="field"><label for="tx-amount">Monto (USD)</label><input id="tx-amount" name="amount" inputmode="decimal" placeholder="0.00" value="${existing?(existing.amount/100).toFixed(2):""}"><span class="field-error" id="tx-amount-error"></span></div>
+          <div class="field"><label for="tx-date">Fecha</label><input id="tx-date" name="date" type="date" value="${existing?.date||today()}"><span class="field-error" id="tx-date-error"></span></div>
+          <div class="field"><label for="tx-method">Método de pago</label><select id="tx-method" name="method">${PAYMENT_METHODS.map(m=>`<option value="${m}" ${existing?.paymentMethod==m?"selected":""}>${m[0].toUpperCase()+m.slice(1)}</option>`).join("")}</select><span class="field-error"></span></div>
+          <div class="field"><label for="tx-note">Nota (opcional)</label><input id="tx-note" name="note" maxlength="100" value="${escapeHtml(existing?.note||"")}"><span class="field-error" id="tx-note-error"></span></div>
+          <label class="check-row"><input id="tx-fixed" type="checkbox" name="fixed" ${existing?.fixed?"checked":""} ${selectedType=="income"?"disabled":""}> Gasto fijo</label>
+          </div><div class="form-actions"><button class="button" type="button" data-cancel>Cancelar</button><button class="button primary" type="submit">${existing?"Guardar":"Agregar"}</button></div></form>`;
+        openDialog(existing?"Editar movimiento":"Nuevo movimiento",form(),values=>{
+          const amount=centsInput(values.amount),date=values.date,note=values.note.trim(),type=values.type,category=values.category,method=values.method,fixed=type=="expense"&&values.fixed=="on";
+          fieldError("tx-amount",amount?"":"El monto debe ser mayor que 0.");fieldError("tx-date",validDate(date)?"":"Selecciona una fecha válida.");fieldError("tx-category",app.data.categories.some(c=>c.name==category&&c.type==type)?"":"Selecciona una categoría.");fieldError("tx-note",note.length<=100?"":"Máximo 100 caracteres.");
+          if(!amount||!validDate(date)||note.length>100||!app.data.categories.some(c=>c.name==category&&c.type==type)||!PAYMENT_METHODS.includes(method))return;
+          const item={id:existing?.id||id(),type,amount,category,date,note,paymentMethod:method,fixed};
+          if(existing)Object.assign(existing,item);else app.data.transactions.push(item);
+          save();closeDialog();renderAll();
+        });
+        $("#tx-type").addEventListener("change",e=>{$("#tx-category").innerHTML=categoryOptions(e.target.value,"");$("#tx-fixed").disabled=e.target.value=="income";if(e.target.value=="income")$("#tx-fixed").checked=false});
+        $("[data-cancel]").addEventListener("click",closeDialog);
+        $("#tx-form").addEventListener("submit",e=>{e.preventDefault();const fd=new FormData(e.target);dialogSubmit(Object.fromEntries(["type","category","amount","date","method","note","fixed"].map(k=>[k,fd.get(k)??""])))});
+      }
+      // Propósito: generar identificador local. Entrada: ninguna. Devuelve: texto.
+      function id(){return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,9)}
+      // Propósito: generar opciones de categoría escapadas. Entrada: tipo y selección. Devuelve: HTML.
+      function categoryOptions(type,selected=""){return app.data.categories.filter(c=>c.type==type).map(c=>`<option value="${escapeHtml(c.name)}" ${c.name==selected?"selected":""}>${escapeHtml(c.emoji+" "+c.name)}</option>`).join("")}
+      // Propósito: capturar presupuesto. Entrada: ninguna. Devuelve: guarda límite mensual.
+      function budgetForm(existing=null){
+        const expenses=app.data.categories.filter(c=>c.type=="expense");if(!expenses.length){alert("Agrega una categoría de gasto.");return}
+        openDialog(existing?"Editar presupuesto":"Nuevo presupuesto",`<form id="budget-form" novalidate><div class="form-grid"><div class="field"><label>Categoría</label><select name="category">${expenses.map(c=>`<option ${existing?.category==c.name?"selected":""} value="${escapeHtml(c.name)}">${escapeHtml(c.emoji+" "+c.name)}</option>`).join("")}</select></div><div class="field"><label>Límite USD</label><input name="limit" inputmode="decimal" value="${existing?(existing.limit/100).toFixed(2):""}"><span class="field-error" id="budget-error"></span></div><div class="field"><label>Mes</label><input name="month" type="month" value="${existing?.month||selectedMonth()}"></div></div><div class="form-actions"><button class="button" type="button" data-cancel>Cancelar</button><button class="button primary" type="submit">Guardar</button></div></form>`,v=>{
+          const limit=centsInput(v.limit);if(!limit||!validMonth(v.month)){fieldError("budget-error","Revisa el límite y el mes.");return}const old=app.data.budgets.find(b=>b.month==v.month&&b.category==v.category);if(old)old.limit=limit;else app.data.budgets.push({month:v.month,category:v.category,limit});save();closeDialog();renderAll();
+        });
+        $("[data-cancel]").addEventListener("click",closeDialog);
+        $("#budget-form").addEventListener("submit",e=>{e.preventEvent?.();e.preventDefault();dialogSubmit(Object.fromEntries(new FormData(e.target)))} );
+      }
+      // Propósito: capturar meta. Entrada: meta opcional. Devuelve: guarda objetivo.
+      function goalForm(existing=null){
+        openDialog(existing?"Editar meta":"Nueva meta",`<form id="goal-form" novalidate><div class="form-grid"><div class="field"><label>Nombre</label><input name="name" maxlength="60" value="${escapeHtml(existing?.name||"")}"></div><div class="field"><label>Objetivo USD</label><input name="target" inputmode="decimal" value="${existing?(existing.target/100).toFixed(2):""}"></div><div class="field"><label>Ahorrado USD</label><input name="saved" inputmode="decimal" value="${existing?(existing.saved/100).toFixed(2):"0.00"}"></div><div class="field"><label>Fecha límite</label><input name="due" type="date" value="${escapeHtml(existing?.due||"")}"></div><span class="field-error" id="goal-error"></span></div><div class="form-actions"><button class="button" type="button" data-cancel>Cancelar</button><button class="button primary" type="submit">Guardar</button></div></form>`,v=>{
+          const target=centsInput(v.target),saved=v.saved=="0"||v.saved=="0.00"?0:centsInput(v.saved);if(!v.name.trim()||v.name.length>60||!target||saved==null||(v.due&&!validDate(v.due))){$("#goal-error").textContent="Revisa nombre, montos y fecha.";return}const g={id:existing?.id||id(),name:v.name.trim(),target,saved,due:v.due||""};if(existing)Object.assign(existing,g);else app.data.goals.push(g);save();closeDialog();renderAll();
+        });
+        $("[data-cancel]").addEventListener("click",closeDialog);$("#goal-form").addEventListener("submit",e=>{e.preventDefault();dialogSubmit(Object.fromEntries(new FormData(e.target)))});
+      }
+      // Propósito: capturar categoría. Entrada: categoría opcional. Devuelve: guarda nombre/tipo/emoji.
+      function categoryForm(existing=null){
+        openDialog(existing?"Editar categoría":"Nueva categoría",`<form id="category-form" novalidate><div class="form-grid"><div class="field"><label>Emoji</label><input name="emoji" maxlength="8" value="${escapeHtml(existing?.emoji||"📦")}"></div><div class="field"><label>Nombre</label><input name="name" maxlength="40" value="${escapeHtml(existing?.name||"")}"></div><div class="field"><label>Tipo</label><select name="type"><option value="expense" ${existing?.type!="income"?"selected":""}>Gasto</option><option value="income" ${existing?.type=="income"?"selected":""}>Ingreso</option></select></div><span class="field-error" id="category-error"></span></div><div class="form-actions"><button class="button" type="button" data-cancel>Cancelar</button><button class="button primary" type="submit">Guardar</button></div></form>`,v=>{
+          v.name=v.name.trim();if(!v.name||v.name.length>40||!v.emoji||!["income","expense"].includes(v.type)||app.data.categories.some(c=>c!=existing&&c.type==v.type&&c.name.toLowerCase()==v.name.toLowerCase())){$("#category-error").textContent="Completa emoji/nombre y evita duplicados.";return}if(existing){const old=existing.name,oldType=existing.type;Object.assign(existing,{name:v.name,type:v.type,emoji:v.emoji});app.data.transactions.filter(t=>t.category==old&&t.type==oldType).forEach(t=>{t.category=v.name;t.type=v.type;if(v.type=="income")t.fixed=false});app.data.budgets.filter(b=>b.category==old).forEach(b=>b.category=v.name)}else app.data.categories.push({name:v.name,type:v.type,emoji:v.emoji});save();closeDialog();renderAll();
+        });
+        $("[data-cancel]").addEventListener("click",closeDialog);$("#category-form").addEventListener("submit",e=>{e.preventDefault();dialogSubmit(Object.fromEntries(new FormData(e.target)))});
+      }
+
+      /* ========== SECCIÓN: PÁGINA INICIO ========== */
+      // Propósito: renderizar semáforo exacto. Entrada: mes, métricas. Devuelve: HTML visible.
+      function renderHealth(month,m){
+        const budgets=app.data.budgets.filter(b=>b.month==month);
+        const states=budgets.map(b=>{const spent=app.data.transactions.filter(t=>t.type=="expense"&&t.category==b.category&&t.date.slice(0,7)==month).reduce((n,t)=>n+t.amount,0);return spent/b.limit});
+        const red=m.balance<0||(m.projected!=null&&m.projected>m.income);
+        const warning=!red&&(m.balance==0||(m.balance>0&&m.savings!=null&&m.savings<10)||states.some(r=>r>=.8));
+        let cls="healthy",icon="●",title="Verde · buen ritmo",text="Balance positivo, ahorro de al menos 10 % y ninguna categoría excedida.";
+        if(!app.data.transactions.some(t=>t.date.slice(0,7)==month)&&!budgets.length){cls="neutral";icon="○";title="Sin datos suficientes";text="No hay movimientos ni presupuestos en este mes. Registra datos para ver el estado."}
+        else if(red){cls="danger";icon="!";title="Rojo · atención";text=m.balance<0?"El balance actual es negativo.":"El gasto proyectado de cierre supera los ingresos."}
+        else if(warning){cls="warn";icon="△";title="Amarillo · presta atención";const parts=[];if(m.balance==0)parts.push("el balance está en cero");if(m.balance>0&&m.savings!=null&&m.savings<10)parts.push("la tasa de ahorro es menor al 10 %");if(states.some(r=>r>=.8&&r<1))parts.push("una categoría alcanzó al menos el 80 %");if(states.some(r=>r>=1))parts.push("una categoría llegó o pasó el 100 %");text=parts.join("; ")+"."; }
+        $("#health").className="health card "+cls;$("#health").innerHTML=`<div class="icon" aria-hidden="true">${icon}</div><div><strong>${title}</strong><p>${escapeHtml(text)} <span class="hide-mobile">Balance ${money(m.balance)} · ahorro ${m.savings==null?"—":m.savings.toFixed(1)+" %"}</span></p></div>`;
+      }
+      // Propósito: renderizar Inicio. Entrada: mes. Devuelve: contenido de tarjetas y últimos movimientos.
+      function renderHome(month){
+        const m=indicators(month);renderHealth(month,m);
+        const stats=[
+          ["Balance",money(m.balance),m.balance<0?"Saldo negativo":"Ingresos menos gastos"],
+          ["Ahorro",m.savings==null?"—":m.savings.toFixed(1)+" %",m.savings==null?"Sin ingresos":"Tasa mensual"],
+          ["Gasto diario",m.daily==null?"—":money(m.daily),`${m.elapsed} de ${m.total} días`],
+          ["Dinero restante",m.remaining==null?"—":m.remaining+" días",m.remaining==null?"Promedio disponible insuficiente":"Al ritmo actual"],
+          ["Cierre proyectado",m.projected==null?"—":money(m.projected),m.projected==null?"Período futuro":"Gasto/día × días totales"]
+        ];
+        $("#home-stats").innerHTML=stats.map((s,i)=>`<article class="card stat"><div class="stat-label"><span>${s[0]}</span><span>${["◫","◎","≈","◷","▥"][i]}</span></div><div class="stat-value">${s[1]}</div><div class="stat-note">${escapeHtml(s[2])}</div></article>`).join("");
+        const recent=app.data.transactions.filter(t=>t.date.slice(0,7)==month).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id)).slice(0,5);
+        $("#recent-date").textContent=monthLabel(month);
+        $("#recent-list").innerHTML=recent.length?recent.map(t=>movementRow(t,true)).join(""):`<div class="empty">${emptySvg()}<strong>Sin movimientos</strong><span>Agrega tu primer ingreso o gasto.</span></div>`;
+      }
+      // Propósito: crear fila reutilizable. Entrada: movimiento, compacta. Devuelve: HTML escapado.
+      function movementRow(t,compact=false){
+        const c=app.data.categories.find(c=>c.name==t.category&&c.type==t.type);
+        return `<div class="list-row"><div class="emoji">${escapeHtml(c?.emoji||"📦")}</div><div><div class="row-title">${escapeHtml(t.note||c?.name||"Movimiento")}</div><div class="row-sub">${escapeHtml(c?.name||"Sin categoría")} · ${dateLabel(t.date)} · ${escapeHtml(t.paymentMethod)}${t.fixed?" · fijo":""}</div></div><div class="${t.type=="income"?"positive":"negative"} amount">${t.type=="income"?"+":"−"}${money(t.amount)}${compact?"":`<div class="row-actions"><button class="icon-button" type="button" data-edit-tx="${escapeHtml(t.id)}">Editar</button><button class="icon-button" type="button" data-del-tx="${escapeHtml(t.id)}">Eliminar</button></div>`}</div></div>`;
+      }
+
+      /* ========== SECCIÓN: PÁGINA MOVIMIENTOS ========== */
+      // Propósito: completar filtros y lista. Entrada: mes y filtros DOM. Devuelve: tabla/lista.
+      function renderMovements(month){
+        const active= $("#filter-category").value;
+        $("#filter-category").innerHTML=`<option value="">Todas las categorías</option>`+app.data.categories.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name==active?"selected":""}>${escapeHtml(c.emoji+" "+c.name)}</option>`).join("");
+        const type=$("#filter-type").value,category=$("#filter-category").value,method=$("#filter-method").value,search=$("#filter-search").value.trim().toLowerCase();
+        const items=app.data.transactions.filter(t=>t.date.slice(0,7)==month&&(!type||t.type==type)&&(!category||t.category==category)&&(!method||t.paymentMethod==method)&&(!search||(t.note||"").toLowerCase().includes(search))).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+        $("#movement-list").innerHTML=items.length?items.map(t=>movementRow(t)).join(""):`<div class="empty">${emptySvg()}<strong>No hay movimientos</strong><span>Prueba otro filtro o agrega uno nuevo.</span></div>`;
+      }
+
+      /* ========== SECCIÓN: PRESUPUESTO Y METAS ========== */
+      function renderBudgets(month){
+        const bs=app.data.budgets.filter(b=>b.month==month),m=indicators(month);
+        $("#budget-list").innerHTML=bs.length?bs.map(b=>{
+          const spent=app.data.transactions.filter(t=>t.type=="expense"&&t.category==b.category&&t.date.slice(0,7)==month).reduce((n,t)=>n+t.amount,0),ratio=b.limit?spent/b.limit:0,percent=ratio*100,status=ratio>=1?"over":ratio>=.8?"warn":"";
+          const text=ratio>=1?"Alcanzaste o superaste el 100 %":ratio>=.8?"Alcanzaste al menos el 80 %":"Dentro del límite";
+          return `<div class="budget-row"><div class="budget-meta"><strong>${escapeHtml(emojiFor(b.category)+" "+b.category)}</strong><span>${money(spent)} / ${money(b.limit)}</span></div><div class="track" role="progressbar" aria-label="${escapeHtml(b.category)}" aria-valuemin="0" aria-valuemax="${b.limit}" aria-valuenow="${Math.min(spent,b.limit)}"><span class="${status}" style="width:${Math.min(percent,100)}%"></span></div><div class="budget-meta"><span class="budget-note">${percent.toFixed(1)} % · ${text}</span><div><button class="icon-button" data-edit-budget="${escapeHtml(b.month)}|${escapeHtml(b.category)}">Editar</button><button class="icon-button" data-del-budget="${escapeHtml(b.month)}|${escapeHtml(b.category)}">Eliminar</button></div></div></div>`;
+        }).join(""):`<div class="empty">${emptySvg()}<strong>Sin límites</strong><span>Crea un presupuesto por categoría.</span></div>`;
+        $("#fixed-summary").textContent=m.fixedRate==null?"Sin ingresos: no hay proporción disponible":`${money(m.fixed)} en gastos fijos · ${m.fixedRate.toFixed(1)} % de los ingresos`;
+      }
+      // Propósito: calcular requerimiento de meta sin zona horaria. Entrada: meta. Devuelve: mensaje.
+      function goalText(g){
+        if(g.saved>=g.target)return "Meta completada";
+        if(!g.due)return "Sin fecha límite";
+        const[y,m,d]=g.due.split("-").map(Number),due=Date.UTC(y,m-1,d),todayUtc=Date.UTC(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()),days=Math.round((due-todayUtc)/86400000),remaining=g.target-g.saved;
+        if(days<0)return "Vencida · plazo terminado";
+        if(days<30)return `Vence en ${days} días · ${days==0?"completa hoy":money(Math.ceil(remaining*30/Math.max(days,1)))+" al mes"}`;
+        return `Ahorra ${money(Math.ceil(remaining*30/days))} al mes`;
+      }
+      function renderGoals(){
+        $("#goal-list").innerHTML=app.data.goals.length?app.data.goals.map(g=>{
+          const pct=Math.min(100,Math.round(g.saved/g.target*100));return `<article class="goal"><div class="goal-head"><strong>${escapeHtml(g.name)}</strong><small>${money(g.saved)} / ${money(g.target)}</small></div><div class="track" role="progressbar" aria-valuenow="${Math.min(g.saved,g.target)}" aria-valuemax="${g.target}"><span style="width:${pct}%"></span></div><div class="budget-meta"><span class="budget-note">${pct}% · ${escapeHtml(goalText(g))}${g.due?" · límite "+dateLabel(g.due):""}</span><div class="goal-actions"><button class="icon-button" data-edit-goal="${escapeHtml(g.id)}">Editar</button><button class="icon-button" data-del-goal="${escapeHtml(g.id)}">Eliminar</button></div></div></article>`;
+        }).join(""):`<div class="empty">${emptySvg()}<strong>Aún no tienes metas</strong><span>Crea una meta de ahorro.</span></div>`;
+      }
+
+      /* ========== SECCIÓN: REPORTES Y GRÁFICOS SVG ========== */
+      // Propósito: dibujar barras de categoría. Entrada: mes. Devuelve: SVG o estado vacío.
+      function categoryChart(month){
+        const rows=app.data.categories.filter(c=>c.type=="expense").map(c=>({name:c.name,emoji:c.emoji,amount:app.data.transactions.filter(t=>t.type=="expense"&&t.category==c.name&&t.date.slice(0,7)==month).reduce((n,t)=>n+t.amount,0)})).filter(r=>r.amount).sort((a,b)=>b.amount-a.amount);
+        if(!rows.length){$("#category-chart").innerHTML=`<div class="empty">${emptySvg()}<strong>Sin gastos por categoría</strong><span>Los datos aparecerán al registrar gastos.</span></div>`;return}
+        const w=680,left=150,max=Math.max(...rows.map(r=>r.amount)),h=40*rows.length+20;
+        const svg=rows.map((r,i)=>{const bw=(w-left-70)*r.amount/max,y=20+i*40;return `<text class="chart-label" x="${left-8}" y="${y+15}" text-anchor="end">${escapeHtml(r.emoji+" "+r.name)}</text><rect class="category-bar" x="${left}" y="${y}" width="${bw}" height="18" rx="5"><title>${escapeHtml(r.name+": "+money(r.amount))}</title></rect><text class="chart-label" x="${left+bw+7}" y="${y+14}">${escapeHtml(money(r.amount))}</text>`}).join("");
+        $("#category-chart").innerHTML=`<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Gastos por categoría">${svg}</svg>`;
+      }
+      // Propósito: dibujar tendencia de seis meses. Entrada: mes final. Devuelve: SVG o vacío.
+      function trendChart(month){
+        const rows=Array.from({length:6},(_,i)=>offsetMonth(month,i-5)).map(m=>({m,income:sum("income",m),expense:sum("expense",m)}));
+        if(!rows.some(r=>r.income||r.expense)){ $("#trend-chart").innerHTML=`<div class="empty">${emptySvg()}<strong>Sin tendencia disponible</strong><span>Registra movimientos en los últimos seis meses.</span></div>`;return}
+        const w=680,h=240,left=65,right=15,top=15,bottom=38,pw=w-left-right,ph=h-top-bottom,max=Math.max(100,...rows.flatMap(r=>[r.income,r.expense])),x=i=>left+i*pw/5,y=v=>top+ph-v/max*ph;
+        let grid="";
+        for(let i=0;i<=3;i++){const yy=top+ph*i/3,amt=max*(3-i)/3;grid+=`<line class="grid-line" x1="${left}" y1="${yy}" x2="${w-right}" y2="${yy}"></line><text class="chart-label" x="${left-6}" y="${yy+3}" text-anchor="end">${escapeHtml(money(amt))}</text>`}
+        const income=rows.map((r,i)=>x(i)+","+y(r.income)).join(" "),expense=rows.map((r,i)=>x(i)+","+y(r.expense)).join(" ");
+        const labels=rows.map((r,i)=>{const[y,m]=r.m.split("-").map(Number),label=new Intl.DateTimeFormat("es",{month:"short"}).format(new Date(y,m-1,1));return `<text class="chart-label" x="${x(i)}" y="${h-10}" text-anchor="middle">${escapeHtml(label)}</text>`}).join("");
+        const dots=rows.map((r,i)=>`<circle class="income-dot" cx="${x(i)}" cy="${y(r.income)}" r="4"><title>Ingresos ${escapeHtml(money(r.income))}</title></circle><circle class="expense-dot" cx="${x(i)}" cy="${y(r.expense)}" r="4"><title>Gastos ${escapeHtml(money(r.expense))}</title></circle>`).join("");
+        $("#trend-chart").innerHTML=`<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Tendencia de seis meses">${grid}<polyline class="income-line" points="${income}"></polyline><polyline class="expense-line" points="${expense}"></polyline>${dots}${labels}</svg>`;
+      }
+      function renderComparison(month){
+        const rows=categoryRows(month);$("#comparison").innerHTML=rows.length?`<table class="table"><thead><tr><th>Categoría</th><th>Actual</th><th>Anterior</th><th>Diferencia</th><th>Var.</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${escapeHtml(r.emoji+" "+r.name)}</td><td>${money(r.cur)}</td><td>${money(r.prior)}</td><td>${r.diff>=0?"+":""}${money(r.diff)}</td><td>${escapeHtml(r.percent)}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">${emptySvg()}<strong>Sin comparación</strong><span>No hay importes para comparar.</span></div>`;
+      }
+      function renderAnts(month,m){
+        $("#ant-note").textContent=`Menor que ${money(app.preferences.antThreshold)} en comida u ocio`;
+        $("#ant-report").innerHTML=m.ants.length?`<strong>${m.ants.length} gasto${m.ants.length==1?"":"s"} hormiga</strong><p class="stat-note">Total ${money(m.totalAnts)}</p>`:`<div class="empty">${emptySvg()}<strong>Sin gastos hormiga</strong><span>Ningún gasto cumple el umbral actual.</span></div>`;
+      }
+
+      /* ========== SECCIÓN: AJUSTES Y RESPALDOS ========== */
+      function renderCategories(){
+        $("#category-manager").innerHTML=app.data.categories.map((c,i)=>`<div class="category-edit"><span class="emoji">${escapeHtml(c.emoji)}</span><div><strong>${escapeHtml(c.name)}</strong><div class="stat-note">${c.type=="income"?"Ingreso":"Gasto"}</div></div><div><button class="icon-button" data-edit-cat="${i}">Editar</button><button class="icon-button" data-del-cat="${i}">Eliminar</button></div></div>`).join("")||`<div class="empty">Sin categorías</div>`;
+      }
+      // Propósito: exportar respaldo con versión y fecha. Entrada: ninguna. Devuelve: descarga JSON.
+      function exportBackup(){
+        const backup={version:2,date:today(),data:app.data,preferences:app.preferences};
+        const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+        a.href=url;a.download=`mis-finanzas-${today()}.json`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      }
+      // Propósito: importar y validar antes de reemplazar. Entrada: archivo. Devuelve: reemplazo confirmado o error.
+      async function importBackup(file){
+        try{
+          const raw=JSON.parse(await file.text());if(!raw||raw.version!==2||typeof raw.date!="string"||!validDate(raw.date)||!raw.data||!raw.preferences)throw Error("El respaldo debe incluir version, date, data y preferences.");
+          const restored=migrate({version:2,data:raw.data,preferences:raw.preferences});validateModel(restored.data,restored.preferences);
+          if(!confirm("Importar reemplazará todos los datos actuales. ¿Deseas continuar?"))return;app=restored;save();applyTheme(app.preferences.theme);renderAll();alert("Respaldo importado.");
+        }catch(error){alert("No se pudo importar: "+(error.message||"archivo no válido"))}
+      }
+      // Propósito: mostrar ilustración SVG simple offline. Entrada: ninguna. Devuelve: SVG amigable.
+      function emptySvg(){return `<svg viewBox="0 0 100 70" aria-hidden="true"><rect x="18" y="12" width="64" height="46" rx="10" fill="var(--surface-2)" stroke="var(--border)"/><path d="M30 48V39M42 48V31M54 48V36M66 48V25" stroke="var(--muted)" stroke-width="5" stroke-linecap="round"/></svg>`}
+
+      /* ========== SECCIÓN: RENDERIZADO Y EVENTOS ========== */
+      // Propósito: actualizar todas las vistas. Entrada: ninguna. Devuelve: panel de página actual actualizado.
+      function renderAll(){
+        const month=selectedMonth();renderHome(month);renderMovements(month);renderBudgets(month);renderGoals();categoryChart(month);trendChart(month);renderComparison(month);renderAnts(month,indicators(month));renderCategories();
+      }
+      // Propósito: sincronizar el período con la fecha real sin sobrescribir una selección manual.
+      // Entrada: ninguna. Devuelve: nada. Uso: intervalos, regreso a la pestaña y arranque.
+      function syncCurrentDate(){
+        const current=monthNow();
+        if(!manualMonthChoice && $("#month").value!==current){
+          $("#month").value=current;
+          renderAll();
+        }
+      }
+      // Evento mes: comparte el período, refresca todas las páginas y registra si fue una elección manual.
+      $("#month").addEventListener("change",()=>{
+        manualMonthChoice=$("#month").value!==monthNow();
+        renderAll();
+      });
+      // Evento filtro: vuelve a pintar movimientos sin navegación ni cambio de mes.
+      ["filter-type","filter-category","filter-method","filter-search"].forEach(id=>$("#"+id).addEventListener(id=="filter-search"?"input":"change",()=>renderMovements(selectedMonth())));
+      // Evento modal: X, Escape nativo y clic fuera cierran sin eliminar datos.
+      $("#dialog-close").addEventListener("click",closeDialog);$("#dialog").addEventListener("cancel",e=>{e.preventDefault();closeDialog()});$("#dialog").addEventListener("click",e=>{if(e.target===$("#dialog"))closeDialog()});
+      // Eventos FAB: abre el mismo formulario CRUD en Inicio/Movimientos.
+      $("#fab").addEventListener("click",()=>transactionForm());
+      $("#add-budget").addEventListener("click",()=>budgetForm());$("#add-goal").addEventListener("click",()=>goalForm());$("#add-category").addEventListener("click",()=>categoryForm());
+      // Evento umbral: mínimo mayor que cero, convierte a centavos y persiste.
+      $("#ant-threshold").addEventListener("change",e=>{const n=Math.round(Number(e.target.value)*100);if(!Number.isSafeInteger(n)||n<=0){alert("El umbral debe ser mayor que cero.");e.target.value=(app.preferences.antThreshold/100).toFixed(2);return}app.preferences.antThreshold=n;save();renderAll();});
+      // Evento tema: persiste cada elección.
+      document.querySelectorAll("[data-theme-choice]").forEach(b=>b.addEventListener("click",()=>{app.preferences.theme=b.dataset.themeChoice;save();applyTheme(app.preferences.theme);}));
+      // Eventos respaldo: exportación y selección local de archivo.
+      $("#export").addEventListener("click",exportBackup);$("#import").addEventListener("click",()=>$("#import-file").click());
+      $("#import-file").addEventListener("change",e=>{if(e.target.files[0])importBackup(e.target.files[0]);e.target.value=""});
+      // Evento ejemplos: reemplazo explícitamente confirmado.
+      $("#examples").addEventListener("click",()=>{if((app.data.transactions.length||app.data.budgets.length||app.data.goals.length)&&!confirm("Cargar ejemplos reemplazará datos actuales. ¿Continuar?"))return;const month=selectedMonth(),[y,m]=month.split("-").map(Number),d=day=>`${y}-${String(m).padStart(2,"0")}-${String(day).padStart(2,"0")}`;app.data.categories=[...DEFAULT_CATEGORIES.map(c=>({...c}))];app.data.transactions=[{id:id(),type:"income",amount:85000,category:"Beca",date:d(2),note:"Beca mensual",paymentMethod:"transferencia",fixed:false},{id:id(),type:"expense",amount:12500,category:"Comida",date:d(3),note:"Supermercado",paymentMethod:"tarjeta",fixed:false},{id:id(),type:"expense",amount:4200,category:"Transporte",date:d(7),note:"Bus al campus",paymentMethod:"efectivo",fixed:false},{id:id(),type:"expense",amount:2800,category:"Ocio",date:d(15),note:"Salida",paymentMethod:"efectivo",fixed:false},{id:id(),type:"expense",amount:6500,category:"Internet y celular",date:d(8),note:"Plan mensual",paymentMethod:"transferencia",fixed:true}];app.data.budgets=[{month,category:"Comida",limit:25000},{month,category:"Transporte",limit:12000},{month,category:"Internet y celular",limit:8000}];app.data.goals=[{id:id(),name:"Laptop para clases",target:80000,saved:27500,due:d(28)}];save();renderAll();alert("Datos de ejemplo cargados.");});
+      // Evento borrar todo: confirma antes de restablecer modelo y preferencias.
+      $("#clear").addEventListener("click",()=>{if(!confirm("¿Borrar movimientos, presupuestos, metas y categorías propias? Esta acción no se puede deshacer."))return;app=fresh();save();applyTheme(app.preferences.theme);renderAll();});
+      // Delegación: procesa editar/eliminar después de que las listas dinámicas vuelvan a pintar.
+      document.addEventListener("click",e=>{
+        const b=e.target.closest("button");if(!b)return;
+        if(b.dataset.editTx){const t=app.data.transactions.find(x=>x.id==b.dataset.editTx);if(t)transactionForm(t)}
+        else if(b.dataset.delTx){const t=app.data.transactions.find(x=>x.id==b.dataset.delTx);if(t&&confirm("¿Eliminar este movimiento?")){app.data.transactions=app.data.transactions.filter(x=>x!=t);save();renderAll()}}
+        else if(b.dataset.editBudget){const[month,...rest]=b.dataset.editBudget.split("|"),cat=rest.join("|"),budget=app.data.budgets.find(x=>x.month==month&&x.category==cat);if(budget)budgetForm(budget)}
+        else if(b.dataset.delBudget){const[month,...rest]=b.dataset.delBudget.split("|"),cat=rest.join("|");if(confirm("¿Eliminar este presupuesto?")){app.data.budgets=app.data.budgets.filter(x=>!(x.month==month&&x.category==cat));save();renderAll()}}
+        else if(b.dataset.editGoal){const g=app.data.goals.find(x=>x.id==b.dataset.editGoal);if(g)goalForm(g)}
+        else if(b.dataset.delGoal){const g=app.data.goals.find(x=>x.id==b.dataset.delGoal);if(g&&confirm("¿Eliminar esta meta?")){app.data.goals=app.data.goals.filter(x=>x!=g);save();renderAll()}}
+        else if(b.dataset.editCat){categoryForm(app.data.categories[Number(b.dataset.editCat)])}
+        else if(b.dataset.delCat){const c=app.data.categories[Number(b.dataset.delCat)];if(c&&confirm(`¿Eliminar la categoría "${c.name}"? Los movimientos asociados se moverán a "Otros".`)){const fallbackName=c.type=="expense"?"Otros":"Otros ingresos";if(!app.data.categories.some(x=>x.name==fallbackName&&x.type==c.type))app.data.categories.push({name:fallbackName,type:c.type,emoji:c.type=="expense"?"📦":"💵"});app.data.transactions.filter(t=>t.category==c.name&&t.type==c.type).forEach(t=>{t.category=fallbackName});app.data.budgets=app.data.budgets.filter(x=>x.category!=c.name);app.data.categories=app.data.categories.filter(x=>x!=c);save();renderAll()}}
+      });
+      // Arranque: carga protegida, mes compartido, tema y ruta hash.
+      load();$("#month").value=monthNow();$("#ant-threshold").value=(app.preferences.antThreshold/100).toFixed(2);$("#ant-threshold-note").textContent="Predeterminado: USD 5. Se cuenta solo gastos menores.";
+      applyTheme(app.preferences.theme);route();
+      // Si el tema está en Automático, sigue el cambio claro/oscuro del teléfono o computadora.
+      if(typeof matchMedia=="function"){
+        const scheme=matchMedia("(prefers-color-scheme: dark)");
+        if(typeof scheme.addEventListener=="function")scheme.addEventListener("change",()=>{if(app.preferences.theme=="auto")applyTheme("auto")});
+      }
+      // Sincronización automática: revisa cada minuto y al regresar a la pestaña.
+      // Así, al pasar un mes o al abrir la app en otra fecha, el período cambia sin tocar el selector.
+      setInterval(syncCurrentDate,60000);
+      document.addEventListener("visibilitychange",()=>{if(!document.hidden)syncCurrentDate()});
+      window.addEventListener("focus",syncCurrentDate);
+    })();
+  </script>
+</body>
+</html>
